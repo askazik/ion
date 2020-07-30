@@ -3,6 +3,7 @@ import datetime
 import configparser
 import sys
 
+
 basedir = os.path.abspath(os.path.dirname(__file__))
 topdir = os.path.abspath(os.path.join(basedir, '..'))
 
@@ -28,7 +29,11 @@ def create_recreate_session(app, logging):
 class Config(object):
     DEBUG = False
     TESTING = False
-    DATABASE_URI = 'sqlite:///:memory:'
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SESSION_TYPE = 'sqlalchemy'
+
+    SUPPORTED_LANGUAGES = {"ru": "Russian", "en": "English"}
+    BABEL_DEFAULT_TIMEZONE = "UTC"
 
 
 class ProductionConfig(Config):
@@ -39,7 +44,6 @@ class ProductionConfig(Config):
     SESSION_REFRESH_EACH_REQUEST = True
 
     SECRET_KEY = os.urandom(64)
-    SESSION_TYPE = 'sqlalchemy'
 
     dialect = config['DATABASE']['dialect']
     driver = config['DATABASE']['driver']
@@ -52,16 +56,12 @@ class ProductionConfig(Config):
     port = config['DATABASE']['port']
     db = config['DATABASE']['db']
 
-    SUPPORTED_LANGUAGES = {"ru": "Russian", "en": "English"}
-    BABEL_DEFAULT_TIMEZONE = "UTC"
-
     SQLALCHEMY_DATABASE_URI = \
         dialect + '+' + driver + '://' + user + ':' + password + '@' + host + ':' + port + '/' + db
 
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-
-class DevelopmentConfig(ProductionConfig):
+class DevelopmentConfig(Config):
+    ENV = 'development'
     DEBUG = True
     TEMPLATES_AUTO_RELOAD = True
     PERMANENT_SESSION_LIFETIME = datetime.timedelta(hours=12)
@@ -70,3 +70,4 @@ class DevelopmentConfig(ProductionConfig):
 
 class TestingConfig(DevelopmentConfig):
     TESTING = True
+    ENV = 'testing'

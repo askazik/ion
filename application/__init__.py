@@ -5,26 +5,29 @@ from flask_migrate import Migrate
 from flask_session import Session
 from flask_sqlalchemy import SQLAlchemy
 
-from application.config import ConfigDevelopment, ConfigRealise
+from application.config import ProductionConfig, DevelopmentConfig, TestingConfig
 
 
 def create_app(test_config=None):
     # create and configure the app
     app = Flask(__name__, instance_relative_config=True)
 
-    app.config.from_mapping(
-        SECRET_KEY='dev',
-        DATABASE=os.path.join(app.instance_path, 'app.sqlite'),
-    )
-
     if test_config is None:
         # load the instance config, if it exists, when not testing
-        app.config.from_object(ConfigDevelopment)
-        # app.config.from_pyfile('config_deploying.py', silent=True)
-    else:
+        app.config.from_object(ProductionConfig)
+    elif test_config == 'dev':
         # load the test config if passed in
-        app.config.from_object(ConfigRealise)
-        # app.config.from_pyfile('config_testing.py', silent=True)
+        app.config.from_object(DevelopmentConfig)
+
+        path = os.path.join(app.instance_path, 'dev.sqlite')
+        SQLALCHEMY_DATABASE_URI = 'sqlite:////{0}:memory:'.format(path)
+        app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
+    elif test_config == 'test':
+        app.config.from_object(TestingConfig)
+
+        path = os.path.join(app.instance_path, 'test.sqlite')
+        SQLALCHEMY_DATABASE_URI = 'sqlite:////{0}:memory:'.format(path)
+        app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
 
     # ensure the instance folder exists
     try:
@@ -50,7 +53,7 @@ def create_app(test_config=None):
 
 if __name__ == "__main__":
 
-    cur_app = create_app()
+    cur_app = create_app('test')
 
     # FIXME: Comment, please, if not DEBUG mode needed!!!
     cur_app.config['ENV'] = 'development'
