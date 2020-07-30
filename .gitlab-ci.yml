@@ -1,0 +1,65 @@
+# Change pip's cache directory to be inside the project directory since we can
+# only cache local items.
+variables:
+    PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+    MYSQL_ROOT_PASSWORD: admin
+
+# Pip's cache doesn't store the python packages
+# https://pip.pypa.io/en/stable/reference/pip_install/#caching
+#
+# If you want to also cache the installed packages, you have to install
+# them in a virtualenv and cache it as well.
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .cache/pip
+    - venv/
+    - log/
+
+
+before_script:
+  - apt update
+  - apt install software-properties-common -y -qq
+  - add-apt-repository ppa:deadsnakes/ppa -y
+  - apt-get install python3-pip -y
+  - apt-get install python3.7 -y
+  - python3.7 -V
+  - pip3 install virtualenv
+  - ls venv/lib
+  - virtualenv -p python3.7 new_venv
+  - source new_venv/bin/activate
+  - pip install -r requirements.txt
+  - mkdir /var/log/ion
+  - chown root:users /var/log/ion
+
+
+stages:
+  - Static Analysis
+  - Test
+
+flake8:
+  stage: Static Analysis
+  script:
+    - flake8 --max-line-length=120 app/*.py
+
+pylint:
+  stage: Static Analysis
+  script:
+    - pylint --rcfile=app/.pylintrc app
+
+pytest:
+  stage: Test
+  image: mysql
+  services:
+    - mysql
+  script:
+    - apt-get update && apt-get --assume-yes install mysql-client
+    - echo "CREATE USER 'admin'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
+      create database employees;
+      ALTER DATABASE employees CHARACTER SET utf8 COLLATE utf8_unicode_ci;
+      GRANT ALL PRIVILEGES ON *.* TO 'admin'@'%';
+      FLUSH PRIVILEGES;
+      show databases;
+      " | mysql --host=mysql --user=root --password="${MYSQL_ROOT_PASSWORD}"
+    - mysql --host=mysql --user=admin --password="${MYSQL_ROOT_PASSWORD}" employees < "test_db/test_employees_db.sql"
+    - pytest
