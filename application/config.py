@@ -64,7 +64,7 @@ class DevelopmentConfig(Config):
     ENV = 'development'
     DEBUG = True
     TEMPLATES_AUTO_RELOAD = True
-    PERMANENT_SESSION_LIFETIME = datetime.timedelta(hours=12)
+    PERMANENT_SESSION_LIFETIME = datetime.timedelta(hours=1)
     SECRET_KEY = 'dev'
 
 
