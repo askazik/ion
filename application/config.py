@@ -35,8 +35,6 @@ class Config(object):
     SUPPORTED_LANGUAGES = {"ru": "Russian", "en": "English"}
     BABEL_DEFAULT_TIMEZONE = "UTC"
 
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///dev.sqlite'
-
 
 class ProductionConfig(Config):
 
@@ -69,7 +67,15 @@ class DevelopmentConfig(Config):
     PERMANENT_SESSION_LIFETIME = datetime.timedelta(hours=1)
     SECRET_KEY = 'dev'
 
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///dev.sqlite'
 
-class TestingConfig(DevelopmentConfig):
-    TESTING = True
+
+class TestingConfig(Config):
     ENV = 'testing'
+    TESTING = True
+    DEBUG = True
+    TEMPLATES_AUTO_RELOAD = True
+    PERMANENT_SESSION_LIFETIME = datetime.timedelta(hours=1)
+    SECRET_KEY = 'test'
+
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///test.sqlite'

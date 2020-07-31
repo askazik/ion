@@ -1,4 +1,5 @@
 from datetime import datetime
+from flask_sqlalchemy import SQLAlchemy
 
 from sqlalchemy import Column, Integer, ForeignKey, DateTime, Date, String, Boolean, func, \
     CheckConstraint, event, BLOB, Text, Time
@@ -6,12 +7,10 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from flask import current_app
-
-Base = declarative_base()
+db = SQLAlchemy()
 
 
-class Users(current_app.db.Model):
+class Users(db.Model):
     __tablename__ = 'users'
     __table_args__ = {'extend_existing': True}
 
