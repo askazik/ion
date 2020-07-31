@@ -2,7 +2,7 @@ import os
 
 from flask import Flask
 from flask_migrate import Migrate
-from flask_session import Session
+from flask_session import Session, SqlAlchemySessionInterface
 from flask_sqlalchemy import SQLAlchemy
 
 from application.config import ProductionConfig, DevelopmentConfig, TestingConfig
@@ -26,10 +26,15 @@ def create_app(test_config=None):
         app.config.from_object(ProductionConfig)
 
     # attach needed instances
-    sess.init_app(app)
-    db.init_app(app)
-    app.db = db
-    migrate.init_app(app, db)
+    with app.app_context():
+        db.init_app(app)
+        app.db = db
+        import application.models
+
+        sess.init_app(app)
+        SqlAlchemySessionInterface(app, db, "sessions", "sess_")
+
+        migrate.init_app(app, db)
 
     # ensure the instance folder exists
     try:
@@ -37,11 +42,6 @@ def create_app(test_config=None):
     except OSError:
         pass
 
-    # check the database models (added for get models changes)
-    with app.app_context():
-        import application.models
-
-    app.session_interface.db.create_all()
 
     @app.route('/hello')
     def hello():
@@ -50,7 +50,6 @@ def create_app(test_config=None):
     return app
 
 
-application = create_app('test')
-
 if __name__ == "__main__":
+    application = create_app('test')
     application.run(debug=True, host='0.0.0.0', port=8001, threaded=True, use_reloader=True)
