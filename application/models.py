@@ -17,8 +17,8 @@ class Users(current_app.db.Model):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String(80), index=True, unique=True)
-    email = Column(String(120), index=True)
-    password = Column(String(256), index=True)
+    email = Column(String(120), index=True, unique=True)
+    pw_hash = Column(String(256), index=True, unique=True)
     rand_number = Column(Integer)  # store the last registration token
     language = Column(String(80), default="en_US")
 
@@ -31,7 +31,7 @@ class Users(current_app.db.Model):
 
     @password_string.setter
     def password_string(self, password):
-        self.password = generate_password_hash(password)
+        self.pw_hash = generate_password_hash(password)
 
     def verify_password(self, password):
-        return check_password_hash(self.password, password)
+        return check_password_hash(self.pw_hash, password)

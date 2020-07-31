@@ -35,6 +35,8 @@ class Config(object):
     SUPPORTED_LANGUAGES = {"ru": "Russian", "en": "English"}
     BABEL_DEFAULT_TIMEZONE = "UTC"
 
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///dev.sqlite'
+
 
 class ProductionConfig(Config):
 
