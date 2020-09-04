@@ -1,8 +1,8 @@
 import datetime
 import os
-import sys
-import pandas as pd
 import pytz
+import glob
+import zarr
 
 
 def convert_datetime_timezone(dt, tz1, tz2):
@@ -17,18 +17,21 @@ def convert_datetime_timezone(dt, tz1, tz2):
     return dt
 
 
-def parse_filename(filename):
+def parse_filename(filepath):
     """Parse name of file for get datetime of samples begin"""
     result = None
 
-    if len(filename) == 12 & filename[0] == 'T':  # new file format
-        year = 2000 + int(filename[1:2])
+    filename = os.path.split(filepath)[1]
+    if len(filename) == 12:  # new file format
+        year = 2000 + int(filename[1:3])
         month = int(filename[3], 16)
-        day = int(filename[4:5])
-        hour = int(filename[6:7])
-        minute = int(filename[9:10])
-        sec = 10 * int(filename[11])
+        day = int(filename[4:6])
+        hour = int(filename[6:8])
+        minute = int(filename[9:11])
+        sec = 6 * int(filename[11])
         result = datetime.datetime(year, month, day, hour, minute, sec)
+    else:
+        raise Exception("Filename length <> 12: {}".format(len(filename)))
 
     return result
 
@@ -36,25 +39,35 @@ def parse_filename(filename):
 def is_valid_file(filename):
     """Check current data file."""
 
-    result = None
+    data_datetime = None
     try:
-        if os.stat(filename).st_size >= 2:
-            result = parse_filename(filename)
+        data_length = int(os.stat(filename).st_size / 2)
+        if data_length >= 1:
+            data_datetime = parse_filename(filename)
+        else:
+            raise Exception("Empty file: {}".format(filename))
     except IOError as err:
         print("Error reading the file {0}: {1}".format(filename, err))
 
-    return result
+    return data_datetime, data_length
 
 
 class CausticSource(object):
     DT = 0.0002505  # real data time step, s
     TZ = pytz.timezone('Europe/Moscow')
+    PREFIX = 'T'
 
-    def __init__(self, path=None, datetime_beg=None, datetime_end=None):
-        self._path = path
+    def __init__(self, path='.', datetime_beg=None, datetime_end=None):
+        path = os.path.abspath(path)
+        if os.path.isdir(path):
+            self._path = path
+        else:
+            raise Exception("Validate given path for dataset: {}".format(path))
+
         self._datetime_beg = datetime_beg
         self._datetime_end = datetime_end
 
+        self._sources = []
         self._init()
 
     @property
@@ -69,42 +82,49 @@ class CausticSource(object):
     def datetime_end(self):
         return self._datetime_end
 
+    @property
+    def sources(self):
+        return self._sources
+
     def _init(self):
-        pass
+        print('Scan {0} for data files...'.format(self._path))
+        file_list = glob.glob(os.path.join(self._path, '{0}???????.???'.format(CausticSource.PREFIX)))
+        for item in file_list:
+            try:
+                data_datetime, data_length = is_valid_file(item)
+            except Exception as ex:
+                print("Filename {0} parsing error: {1}".format(item, ex))
+                continue
+            if data_datetime:
+                source = {'filename': item, 'datetime': data_datetime, 'length': data_length}
+                self._sources.append(source)
+        print('Here are {0} data files.'.format(len(self._sources)))
 
-    def get_paths(self, df):
-        paths = {}
-        self._names = []
-        for phrase, name, filepath in zip(df.phrase, df.name, df.filepath):
-            if phrase not in paths:
-                paths[phrase] = {}
-            paths[phrase][name] = filepath
-            if name not in self._names:
-                self._names.append(name)
-        return paths
+    def _compose_out_filename(self, str_beg, str_end):
+        """Compose filename for output data file"""
+        if not str_beg:
+            str_beg = self._datetime_beg.strftime('%Y-%m-%d')
+        if not str_end:
+            str_end = self._datetime_beg.strftime('%Y-%m-%d')
+        return str_beg + '_' + str_end
 
-    @staticmethod
-    def mkdir(*dirs):
-        for directory in dirs:
-            if not os.path.exists(directory):
-                os.mkdir(directory)
+    def convert_to_zarr(self, str_beg=None, str_end=None, out_filename=None):
+        """Create zarr file for data between datetime_beg and datetime_end."""
 
-    @staticmethod
-    def read_csv(filepath, **kwargs):
-        try:
-            with open(filepath, "rb") as file:
-                df = pd.read_csv(file, **kwargs)
-                return df
-        except Exception as error:
-            sys.stderr.write(f"{error}\n")
+        if not out_filename:
+            out_filename = self._compose_out_filename(str_beg, str_end) + '.zarr'
 
-    @staticmethod
-    def write_csv(filepath, df, **kwargs):
-        try:
-            df.to_csv(filepath, **kwargs)
-        except Exception as error:
-            sys.stderr.write(f"{error}\n")
+        if not str_end:
+            end = self._datetime_end
+        else:
+            end = datetime.datetime.strptime(str_end, '%Y-%m-%d')
+
+        if not str_beg:
+            beg = self._datetime_beg
+        else:
+            beg = datetime.datetime.strptime(str_beg, '%Y-%m-%d')
 
 
 if __name__ == "__main__":
-    a = is_valid_file('test.txt')
+    a = CausticSource('./2016')
+    print(a.sources)
