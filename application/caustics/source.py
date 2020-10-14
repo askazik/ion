@@ -1,11 +1,14 @@
 import datetime
 import os
+import re
 import pytz
 import glob
 import zarr
 import numpy as np
 from multiprocessing import Pool
 from numcodecs import Blosc
+
+import decorators
 
 
 def convert_datetime_timezone(dt, tz1, tz2):
@@ -46,7 +49,7 @@ def is_valid_file(filename):
     try:
         data_length = int(os.stat(filename).st_size / 2)
         if data_length >= 1:
-            data_datetime = parse_filename(filename)
+            data_datetime = np.datetime64(parse_filename(filename))
         else:
             raise Exception("Empty file: {}".format(filename))
     except IOError as err:
@@ -55,13 +58,40 @@ def is_valid_file(filename):
     return data_datetime, data_length
 
 
-class CausticSource(object):
+def is_valid_filename(prefix, filename):
+    """Check filename."""
+
+    is_valid = False
+    pattern_string = '^' + prefix + r'\d{2}[0-9a-f]\d{4}.\d{3}$'
+    pattern = re.compile(pattern_string.lower())
+    if pattern.match(filename.lower()).group():
+        is_valid = True
+
+    return is_valid
+
+
+# Генератор для имён файлов с каустиками
+def files(prefix, path):
+    for file in os.listdir(path):
+        filepath = os.path.join(path, file)
+        if os.path.isfile(filepath):
+            # Нужно проверить на соответствие шаблону!!!
+            if is_valid_filename(prefix, file):
+                yield filepath
+            else:
+                print('<{0}> - has not valid caustic filename!'.format(filepath))
+
+    # for file in files("."):
+    #     print(file)
+
+
+class CausticsToZarr(object):
     DT = 0.0002505  # real data time step, s
     TZ = 'Europe/Moscow'
     PREFIX = 'T'
 
     def __init__(self, path='.', datetime_beg=None, datetime_end=None):
-        path = os.path.abspath(path)
+        path = os.path.abspath(os.path.expanduser(path))
         if os.path.isdir(path):
             self._path = path
         else:
@@ -107,20 +137,19 @@ class CausticSource(object):
 
     def _init(self):
         print('Scan {0} for data files...'.format(self._path))
-        file_list = glob.glob(os.path.join(self._path, '{0}???????.???'.format(self.PREFIX)))
 
         _datetimes = []
         _lengths = []
-        for item in file_list:
+        for file in files(self.PREFIX, self._path):
             try:
-                data_datetime, data_length = is_valid_file(item)
+                data_datetime, data_length = is_valid_file(file)
                 _lengths.append(data_length)
             except Exception as ex:
-                print("Filename {0} parsing error: {1}".format(item, ex))
+                print("Filename {0} parsing error: {1}".format(file, ex))
                 continue
             if data_datetime:
                 _datetimes.append(data_datetime)
-                source = {'filename': item, 'datetime': data_datetime, 'length': data_length}
+                source = {'filename': file, 'datetime': data_datetime, 'length': data_length}
                 self._sources.append(source)
         print('Here are {0} data files.'.format(len(self._sources)))
         self._sources = sorted(self._sources, key=lambda i: i['datetime'])
@@ -137,10 +166,12 @@ class CausticSource(object):
     def _compose_out_filename(self, str_beg, str_end):
         """Compose filename for output data file"""
         if not str_beg:
-            str_beg = self._datetime_beg.strftime('%Y-%m-%d %H:%M')
+            # str_beg = self._datetime_beg.strftime('%Y-%m-%d_%H:%M')
+            str_beg = np.datetime_as_string(self._datetime_beg, unit = 's',timezone=pytz.timezone(self.TZ))
         if not str_end:
-            str_end = self._datetime_end.strftime('%Y-%m-%d %H:%M')
-        return str_beg + ' _ ' + str_end
+            # str_end = self._datetime_end.strftime('%Y-%m-%d_%H:%M')
+            str_end = np.datetime_as_string(self._datetime_end, unit='s', timezone=pytz.timezone(self.TZ))
+        return str_beg + '_' + str_end
 
     def convert_to_zarr(self, str_beg=None, str_end=None, out_filename=None, out_path=None):
         """Create zarr file for data between datetime_beg and datetime_end."""
@@ -165,12 +196,10 @@ class CausticSource(object):
 
         # create hierarchy
         root = zarr.open(store, mode='w')  # means create (fail if exists)
+        # FIXME: Remove these root attributes
         root.attrs['DT'] = self.DT
         root.attrs['TZ'] = self.TZ
-
         raw = root.create_group('raw')
-        raw.attrs['DT'] = self.DT
-        raw.attrs['TZ'] = self.TZ
 
         # Zarr provides support for chunk-level synchronization.
         # This array is safe to read or write within a multi-threaded program.
@@ -197,13 +226,60 @@ class CausticSource(object):
         # print(self.result_list)
 
         # append created axis
-        z_created = raw.zeros('created', shape=(len(self._sources), ), dtype='M8[D]')
+        # FIXME: set an datetime axis (for given TZ!!!)
+        # s -> seconds precision!!!
+        z_created = raw.zeros('created', shape=(len(self._sources), ), dtype='M8[s]')
         z_created[:] = axis_datetime
 
         print(root.tree())
 
 
+class CausticsFromZarr(object):
+
+    def __init__(self, path):
+
+        path = os.path.abspath(os.path.expanduser(path))
+        try:
+            self._zarr = zarr.open(path, mode='r')
+            self._path = path
+        except Exception as e:
+            raise Exception("Validate given path for dataset: {0}. Exception: {1}".format(path, str(e)))
+
+        if 'DT' in self._zarr.attrs:
+            self._DT = self._zarr.attrs['DT']
+
+        if 'TZ' in self._zarr.attrs:
+            self._TZ = self._zarr.attrs['TZ']
+
+        self._source = self._zarr['raw']['source']
+        self._created = self._zarr['raw']['created']
+        self._datetime_beg = self._created[0]
+        self._datetime_end = self._created[-1]
+
+    @property
+    def path(self):
+        return self._path
+
+    @property
+    def datetime_beg(self):
+        return self._datetime_beg
+
+    @property
+    def datetime_end(self):
+        return self._datetime_end
+
+    @property
+    def DT(self):
+        return self._DT
+
+    @property
+    def TZ(self):
+        return self._TZ
+
+
 if __name__ == "__main__":
-    a = CausticSource('/media/askazik/Data/!data/kuleshov/2013')
-    # a = CausticSource('./2013')
-    a.convert_to_zarr()
+    # a = CausticsToZarr('~/!data/lab705/2013')
+    # a.convert_to_zarr()
+
+    b = CausticsFromZarr('2013-10-01T04:10:30+0400_2013-10-01T06:21:48+0400.zarr')
+    print([b.datetime_beg, b.datetime_end])
