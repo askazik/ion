@@ -276,6 +276,11 @@ class CausticsFromZarr(object):
     def TZ(self):
         return self._TZ
 
+    @property
+    def times(self):
+        for item in self._created:
+            yield item
+
 
 if __name__ == "__main__":
     # a = CausticsToZarr('~/!data/lab705/2013')
@@ -283,3 +288,6 @@ if __name__ == "__main__":
 
     b = CausticsFromZarr('2013-10-01T04:10:30+0400_2013-10-01T06:21:48+0400.zarr')
     print([b.datetime_beg, b.datetime_end])
+
+    for item in b.times:
+        print(item)
