@@ -5,6 +5,7 @@ import pytz
 import glob
 import zarr
 import numpy as np
+import pandas as pd
 from multiprocessing import Pool
 from numcodecs import Blosc
 
@@ -278,8 +279,39 @@ class CausticsFromZarr(object):
 
     @property
     def times(self):
-        for item in self._created:
-            yield item
+        for _item in self._created:
+            yield _item
+
+    @property
+    def tree(self):
+        return self.make_tree()
+
+    @staticmethod
+    def make_node(title, key, children):
+        out = {
+            'title': title,
+            'key': key}
+        if children:
+            out['children'] = children
+        return out
+
+    def make_tree(self):
+        """Сборка текущего временного дерева из списка имен извлечённых блоков (файлов каустик)"""
+        _tree = {
+            'title': 'Caustics',
+            'key': '0',
+            'children': []}
+
+        year = None
+        month = None
+        day = None
+        dates = pd.DatetimeIndex(self.times)
+        for date in dates:
+            cur_year = date.year
+            cur_month = date.month
+            cur_day = date.day
+
+        return _tree
 
 
 if __name__ == "__main__":
@@ -291,3 +323,5 @@ if __name__ == "__main__":
 
     for item in b.times:
         print(item)
+
+    tree = b.make_tree()

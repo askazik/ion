@@ -10,7 +10,7 @@ from dash.dependencies import Input, Output
 
 from application.models import db
 from application.homepage import dcc, dbc
-from application.homepage import Homepage, App
+from application.homepage import Homepage, App, build_graph, Caustics
 
 migrate = Migrate()
 sess = Session()
@@ -66,8 +66,19 @@ def create_app(test_config=None):
     def display_page(pathname):
         if pathname == '/time-series':
             return App()
+        elif pathname == '/caustics':
+            return Caustics()
         else:
             return Homepage()
+
+    @app.callback(
+        Output('output', 'children'),
+        [Input('pop_dropdown', 'value')]
+    )
+    def update_graph(city):
+        graph = build_graph(city)
+
+        return graph
 
     return server
 
@@ -77,4 +88,4 @@ if __name__ == "__main__":
     # application = create_app('dev')
     # application = create_app('prod')
 
-    application.run(debug=True, host='0.0.0.0', port=8001, threaded=True, use_reloader=True)
+    application.run(debug=True, host='0.0.0.0', port=8010, threaded=True, use_reloader=True)

@@ -4,6 +4,7 @@ import dash_bootstrap_components as dbc
 def Navbar():
     navbar = dbc.NavbarSimple(
         children=[
+            dbc.NavItem(dbc.NavLink("Caustics", href="/caustics")),
             dbc.NavItem(dbc.NavLink("Time-Series", href="/time-series")),
             dbc.DropdownMenu(
                 nav=True,

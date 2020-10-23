@@ -115,19 +115,3 @@ def App():
 
     return layout
 
-
-def HeaderCaustics():
-    header = html.H3(
-        'Выберите интересующий интервал отображения каустик'
-    )
-    return header
-
-
-def Caustics():
-
-    layout = html.Div([
-        Navbar(),
-        HeaderCaustics()
-    ])
-
-    return layout
