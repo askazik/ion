@@ -22,10 +22,10 @@ plt.style.use('seaborn-whitegrid')
 sns.set_style("white")
 
 
-def draw_caustics(df):
+def draw_caustics(title, df):
     # Draw Plot
     plt.figure(figsize=(16, 10), dpi=80)
-    # plt.plot('time', 'amplitude', data=df, color='tab:red', label='source')
+    plt.plot('time', 'amplitude', data=df, color='tab:blue', label='source')
 
     analytic_signal = hilbert(df.amplitude.tolist())
     amplitude_envelope = np.abs(analytic_signal)
@@ -33,10 +33,10 @@ def draw_caustics(df):
 
     # Decoration
     plt.yticks(fontsize=12, alpha=.7)
-    plt.title("Caustics", fontsize=22)
+    plt.title(title, fontsize=22)
     plt.grid(axis='both', alpha=.3)
-    plt.plot(df.time.tolist(), amplitude_envelope, color='tab:blue', label='envelope')
-    # plt.legend()
+    plt.plot(df.time.tolist(), amplitude_envelope, color='tab:red', label='envelope')
+    plt.legend()
     # ax0.set_xlabel("time in seconds")
     # ax0.plot(t, signal, label='signal')
     # ax0.plot(t, amplitude_envelope, label='envelope')
