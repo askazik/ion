@@ -2,7 +2,6 @@ import datetime
 import os
 import re
 import pytz
-import glob
 import zarr
 import numpy as np
 import pandas as pd
@@ -295,6 +294,24 @@ class CausticsFromZarr(object):
             out['children'] = children
         return out
 
+    def get_block_by_index(self, idx):
+        """Извлечение блока по индексу (порядковому номеру) в открытом файле.
+        Вопрос: А если открыть в объекте много файлов?"""
+        return self._source[idx]
+
+    def get_block_by_name(self, idx):
+        """Извлечение блока по имени в открытом файле.
+        Вопрос: А если открыть в объекте много файлов?"""
+        pass
+
+    def get_blocks_interval_by_index(self, indexes):
+        # for index in indexes:
+        #     yield index
+        pass
+
+    def get_blocks_interval_by_date(self, date1, date2):
+        pass
+
     def make_tree(self):
         """Сборка текущего временного дерева из списка имен извлечённых блоков (файлов каустик)"""
         _tree = {
@@ -312,16 +329,3 @@ class CausticsFromZarr(object):
             cur_day = date.day
 
         return _tree
-
-
-if __name__ == "__main__":
-    # a = CausticsToZarr('~/!data/lab705/2013')
-    # a.convert_to_zarr()
-
-    b = CausticsFromZarr('2013-10-01T04:10:30+0400_2013-10-01T06:21:48+0400.zarr')
-    print([b.datetime_beg, b.datetime_end])
-
-    for item in b.times:
-        print(item)
-
-    tree = b.make_tree()
