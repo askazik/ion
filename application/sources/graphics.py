@@ -25,10 +25,16 @@ sns.set_style("white")
 def draw_caustics(title, df):
     # Draw Plot
     plt.figure(figsize=(16, 10), dpi=80)
-    plt.plot('time', 'amplitude', data=df, color='tab:blue', label='source')
+    # plt.plot('time', 'amplitude', data=df, color='tab:blue', label='source')
 
     analytic_signal = hilbert(df.amplitude.tolist())
     amplitude_envelope = np.abs(analytic_signal)
+    amplitude_envelope[amplitude_envelope < 0.05] = 0
+    idx, = np.where(amplitude_envelope == 0)
+    amplitude_mask = np.abs(df.amplitude.tolist())
+    amplitude_mask[idx] = 0
+    plt.plot(df.time.tolist(), amplitude_mask, color='tab:green', label='mask')
+
     # instantaneous_phase = np.unwrap(np.angle(analytic_signal))
 
     # Decoration
